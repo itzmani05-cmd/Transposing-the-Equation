@@ -1,7 +1,7 @@
 import re
 
-equation = 'V=IR'
-getting_input = "R"
+equation = 'y=x/a+3'
+getting_input = "x" 
 
 print("Equation:", equation)
 print("Getting_input:", getting_input)
@@ -86,17 +86,35 @@ def left_side_constant(expression):
 
     return int(coefficient)
 
+def split_terms(expression):
+        print("Expression",expression)
+        terms = []
+        term = ""
+        
+        for char in expression:
+            if char in "+-" :  
+                if term: 
+                    terms.append(term.strip())
+                term = char 
+            else:
+                term += char  
+        
+        if term: 
+            terms.append(term.strip())
+        print("Terms",terms)
+        return terms
 
 if '=' not in equation:
     print("Invalid equation")
     
 else:
     lhs, rhs = equation.split("=")
-    lhs_terms = re.findall(r"[+-]?\w+\^?\d*|\w+", lhs)
-    rhs_terms = re.findall(r"[+-]?\w+\^?\d*|\w+", rhs)
+
+    lhs_terms = split_terms(lhs)
+    rhs_terms = split_terms(rhs)
+
     tokens = lhs_terms + rhs_terms
-    print("Extracted Terms:", tokens)
-    
+    print("Tokens",tokens)
     found = False
     for element in tokens:
         if getting_input in element :
