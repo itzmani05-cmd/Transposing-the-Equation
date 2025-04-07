@@ -1,0 +1,156 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import re
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class EquationClass(BaseModel):
+    equation: str
+    variable: str
+
+def split_terms(expression):
+    print("Expression in split_terms" + expression)
+    terms = []
+    term = ""
+    for char in expression:
+        if char in "+-":
+            if term:
+                terms.append(term.strip())
+            term = char
+        else:
+            term += char
+    if term:
+        terms.append(term.strip())
+    print("Terms in split_terms ", terms )
+    return terms
+
+def split_equation(equation):
+    equation = equation.replace(" ", "")
+    result = []
+    term = ""
+    
+    for char in equation:
+        if char in "+-":  
+            if term:  
+                result.append(term)
+            term = char  
+        else:
+            term += char  
+    if term:
+        result.append(term)
+        
+    return result
+
+def lhs_rhs(lhs, rhs, variable):
+    left_side, right_side = [], []
+
+    lhs_terms = split_equation(lhs)
+    rhs_terms = split_equation(rhs)
+    print("LHS Terms ",lhs_terms)
+    print("RHS Terms", rhs_terms)
+
+    for term in lhs_terms:
+        term = term.strip()
+        if term and variable in term:
+            left_side.append(term)
+        else:
+            if term.startswith("-"):
+                right_side.append(f"+{term[1:]}")
+            elif term.startswith("+"):
+                right_side.append(f"-{term[1:]}")
+            else:
+                right_side.append(f"-{term}")
+
+    for term in rhs_terms:
+        term = term.strip()
+        if term and variable in term:
+            if term.startswith("-"):
+                left_side.append(f"+{term[1:]}")
+            elif term.startswith("+"):
+                left_side.append(f"-{term[1:]}")
+            else:
+                left_side.append(f"-{term}")
+        else:
+            if term.startswith("-") or term.startswith("+"):
+                right_side.append(term)
+            else:
+                right_side.append(f"+{term}")
+
+    print("Left_side: ",left_side)
+    print("Right_side ",right_side )
+
+    return left_side, right_side
+
+
+def get_coefficient(expression, variable):
+    expression = expression.replace('-', '+-')
+    terms = expression.split('+')
+    
+    result = []
+    for term in terms:
+        term = term.strip()
+        if term == "":
+            continue
+        if variable in term:
+            index = term.find(variable)
+            coeff = term[:index]
+            if coeff == "":
+                coeff = "+1"
+            elif coeff == "-":
+                coeff = "-1"
+            result.append(coeff)
+    combined = ''.join(result)
+    return combined
+
+
+@app.post("/")
+def solve_equation(data: EquationClass):
+    equation = data.equation
+    variable = data.variable
+
+    if '=' not in equation:
+        return {"error": "Invalid equation"}
+
+    lhs, rhs = equation.split("=")
+    lhs_terms = split_terms(lhs)
+    rhs_terms = split_terms(rhs)
+
+    tokens = lhs_terms + rhs_terms
+    found = False
+
+    for element in tokens:
+        if variable in element:
+            left_side, right_side = lhs_rhs(lhs, rhs, variable)
+            left_side_str = "".join(left_side)
+            right_side_str = "".join(right_side)  
+
+            coefficient = get_coefficient(left_side_str,variable)
+
+            try:
+                if coefficient and coefficient != 0:
+                    result = f"{variable} = {right_side_str} / {coefficient}"
+                else:
+                    if left_side_str.startswith("-"):
+                        right_side_str = right_side_str.replace(" ", "").replace("-", "+").replace("+", "-")
+                        left_side_str = left_side_str[1:]
+                    if left_side_str.startswith("+"):
+                        left_side_str = left_side_str[1:]
+                    result = f"{left_side_str} = {right_side_str}"
+
+            except Exception as e:
+                return {"error": f"Error evaluating equation: {e}"}
+
+            found = True
+            return {"result": result}
+
+    if not found:
+        return {"error": "Variable not found in the equation"}
