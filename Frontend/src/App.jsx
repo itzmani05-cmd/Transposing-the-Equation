@@ -1,105 +1,143 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
-function App() {
-  const [equation, setEquation] = useState("");
+const keys = {
+  mathPad: [
+    ["x","7", "8", "9", "clr"],
+    ["y","4", "5", "6", "+", "-"],
+    ["z","1", "2", "3", "*", "%"],
+    ["a", "b", "0", "(", ")", "=", "abc"]
+  ],
+  qwerty: [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+    ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+    ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+    ["clr", "z", "x", "c", "v", "b", "n", "m", "del"],
+    ["123", "space", "enter"]
+  ]
+};
+
+export default function CustomKeyboard() {
+  const [input, setInput] = useState("");
   const [variable, setVariable] = useState("");
-  const [result, setResult] = useState([]);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [activeField, setActiveField] = useState("equation");
+  const [showQwerty, setShowQwerty] = useState(false);
+  const [result, setResult] = useState("");
 
-  const solvingEqu = async () => {
-    if (!equation || !variable) {
-      alert("Enter both the Equation and Variable!");
-      setResult([]);
-      setError("");
+  const handleKeyPress = (key) => {
+    const value = activeField === "equation" ? input : variable;
+    const setValue = activeField === "equation" ? setInput : setVariable;
+
+    if (key === "space") return setValue(value + " ");
+    if (key === "del") return setValue(value.slice(0, -1));
+    if (key === "clr") return setValue("");
+    if (key === "abc") return setShowQwerty(true);
+    if (key === "123") return setShowQwerty(false);
+    if (["shift", "emoji", "enter"].includes(key)) return;
+    const FunctionsKey = ["log", "sqrt", "sin", "cos", "tan", "ln"];
+    if (FunctionsKey.includes(key)) return setValue(value + key + "(");
+    setValue(value + key);
+  };
+
+  const renderButton = (key, index) => {
+    const isSpace = key === "space";
+    const isEnter = key === "enter";
+    const wideKeys = ["space", "enter", "abc", "clr", "del", "123"];
+    const isWide = wideKeys.includes(key);
+
+    return (
+      <button
+        key={index}
+        onClick={() => handleKeyPress(key)}
+        className={`py-3 px-4 m-1 rounded-xl bg-gray-100 text-gray-800 text-lg font-medium shadow-sm hover:bg-gray-200 transition
+          ${isSpace ? "w-[240px]" : isEnter ? "w-[100px]" : isWide ? "w-[64px]" : "w-[48px]"}`}
+      >
+        {key === "space" ? "" : key}
+      </button>
+    );
+  };
+
+  const solveEquation = async () => {
+    if (!variable) {
+      setResult("Please enter a variable to solve for.");
       return;
     }
-    setLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/", {
+      const res = await fetch("http://localhost:8000/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          equation: equation.trim(), 
-          solve_for: variable.trim()
-        }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          equation: input,
+          solve_for: variable
+        })
       });
 
-      const data = await response.json();
-      console.log("Response Data:", data);
-
-      if (data.detail) {
-        setError(data.detail);
-        setResult([]);
+      const data = await res.json();
+      if (res.ok) {
+        setResult(data.solution.join("\n"));
       } else {
-        setResult(data.solution);
-        setError("");
+        setResult("Error: " + data.detail);
       }
     } catch (err) {
-      setError("Unable to connect to the server!");
-      setResult([]);
-    } finally {
-      setLoading(false);
+      setResult("Error: " + err.message);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-        <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center mb-4">Equation Solver</h1>
-          <input
-            type="text"
-            value={equation}
-            onChange={(e) => setEquation(e.target.value)}
-            placeholder="Enter equation like 2y + 3 = x"
-            className="w-full px-4 py-2 border rounded-md mb-4"
-          />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-5">
+      <div className="w-full max-w-[800px] bg-white rounded-3xl shadow-lg p-6 space-y-5">
+        <h1 className="text-2xl font-bold text-center text-gray-800">Transposing the Equation</h1>
 
-          <input
-            type="text"
-            value={variable}
-            onChange={(e) => setVariable(e.target.value)}
-            placeholder="Enter variable like y"
-            className="w-full px-4 py-2 border rounded-md mb-4"
-          />
+        {/* Equation Input Display */}
+        <div
+          onClick={() => setActiveField("equation")}
+          className={`p-3 border rounded-xl text-lg shadow-inner bg-white cursor-pointer ${
+            activeField === "equation" ? "border-blue-500" : "border-gray-300"
+          }`}
+        >
+          {input || "Enter equation"}
+        </div>
 
-          <button
-            onClick={solvingEqu}
-            className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:opacity-50"
-            disabled={loading}
-          >
-            {loading ? "Solving..." : "Solve"}
-          </button>
+        {/* Variable Input Display */}
+        <div
+          onClick={() => setActiveField("variable")}
+          className={`p-3 border rounded-xl text-lg shadow-inner bg-white cursor-pointer ${
+            activeField === "variable" ? "border-blue-500" : "border-gray-300"
+          }`}
+        >
+          {variable || "Enter variable to solve for"}
+        </div>
 
-          {error && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-300 text-red-800 rounded-xl shadow-sm">
-              <strong className="block font-semibold mb-1">Error:</strong>
-              <p className="text-sm">{error}</p>
-            </div>
-          )}
+        {/* Solve Button */}
+        <button
+          onClick={solveEquation}
+          className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition"
+        >
+          Solve
+        </button>
 
+        {/* Display the result*/}
+        <div className="p-4 bg-gray-100 text-gray-800 rounded-xl text-base whitespace-pre-line min-h-[60px]">
+          {result}
+        </div>
 
-          {result.length > 0 && (
-          <div className="mt-6 p-6 bg-green-50 border border-green-300 rounded-xl shadow-sm">
-            <h3 className="text-lg font-semibold text-green-800 mb-2">Rearranged Equation:</h3>
-            <ul className="list-disc list-inside text-green-700 space-y-1">
-              {result.map((res, index) => (
-                <li key={index} className="text-base">
-                  {res}
-                </li>
-              ))}
-            </ul>
+        {/* Custom Keyboard */}
+        {!showQwerty ? (
+          <div className="grid grid-cols-5 gap-2 bg-gray-50 p-5 rounded-xl shadow-inner">
+            {keys.mathPad.flat().map(renderButton)}
+          </div>
+        ) : (
+          <div className="space-y-2 bg-gray-50 p-4 rounded-xl shadow-inner">
+            {keys.qwerty.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex justify-center gap-1">
+                {row.map((key, index) => renderButton(key, `${rowIndex}-${index}`))}
+              </div>
+            ))}
           </div>
         )}
-
-
-
-        </div>
       </div>
     </div>
   );
 }
-
-export default App;
